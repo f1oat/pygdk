@@ -19,11 +19,11 @@ class Mill(Machine):
     def __init__(self, json_file):
         super().__init__(json_file)
         self.queue(comment='Loading Mill parameters from JSON', style='mill')
-        with open(f"machines/{json_file}") as f:
+        with open(f"{self.gdkpath}/machines/{json_file}") as f:
             dict = json.load(f)
             if 'Tool Table' not in dict:
                 raise KeyError(f"{RED}You machine configuration must reference a tool table file{ENDC}")
-            with open(f"tables/{dict['Tool Table']}", 'r') as tt:
+            with open(f"{self.gdkpath}/tables/{dict['Tool Table']}", 'r') as tt:
                 self._tool_table = json.load(tt)
             self.max_rpm = dict['Max Spindle RPM']
             self.safe_z = 10 #TODO: This should be in a Workpiece class
@@ -79,7 +79,7 @@ class Mill(Machine):
 
     def update_fas(self):
         if self.material and self.tool:
-            fas_file = 'tables/feeds-and-speeds.json'
+            fas_file = f'{self.gdkpath}/tables/feeds-and-speeds.json'
             with open(fas_file, 'r') as fas:
                 self._fas = json.load(fas)
             sfm = self._fas['SFM']
@@ -101,7 +101,8 @@ class Mill(Machine):
                     self.feed = ipm*25.4
                 else:
                     self.queue(comment=f"No manufacturer-recommended IPM Feed.  Calculating.", style='machine')
-                    cl_range = chipload[self.material].get(f"{self.tool.diameter/25.4:.3f}", None)
+                    index = f"{self.tool.diameter/25.4:.3f}"
+                    cl_range = chipload[self.material].get(index, None)
                     if cl_range:
                         cl_mean = (cl_range[0]+cl_range[1])/2
                         self.feed = self.rpm * self.tool.flutes * cl_mean * 25.4

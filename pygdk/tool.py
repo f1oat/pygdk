@@ -25,6 +25,9 @@ class Tool:
             diameter = self._diameter * (25.4 if self._units == 'imperial' else 1)
             machine.queue(comment=f"Looking up Tool {i} in Tool Table: [{self._description}] | {diameter:.4f} mm", style='tool')
 
+    def __repr__(self):
+        return f"Tool diameter={self._diameter} | flutes={self._flutes} | rpm={self._rpm}"
+    
 ################################################################################
 # Tool.number -- Tool Table Index
 ################################################################################

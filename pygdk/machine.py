@@ -30,7 +30,8 @@ LT_WHITE    = '\033[97m'
 ENDC   = '\033[0m'
 
 class Machine:
-
+    gdkpath = os.path.join(os.path.dirname(os.path.realpath(__file__)), '..')
+    
 ################################################################################
 # Initializer -- Load details from JSON
 ################################################################################
@@ -38,13 +39,17 @@ class Machine:
     def __init__(self, json_file):
         if not json_file:
             raise ValueError(f"{RED}All machines must be initialized with a JSON config.  See https://github.com/cilynx/pygdk#quickstart for a quick introduction.")
-        with open(f"machines/{json_file}") as f:
+        with open(f"{self.gdkpath}/machines/{json_file}") as f:
             self.dict = json.load(f)
             for req in ['Name', 'Max Feed Rate (mm/min)']:
                 if not self.dict.get(req, None):
                     raise ValueError(f"{RED}All machines must have '{req}' defined in their JSON config.  See https://github.com/cilynx/pygdk/tree/main/machines for example configurations.")
             self.name = self.dict['Name']
             self.command_queue = [{'comment': f"Initializing Machine {self.name}", 'style': 'machine'}]
+            
+            self._begin_gcode = self.dict.get('Begin_GCODE', None)
+            self._end_gcode = self.dict.get('End_GCODE', None)
+                
             self.controller = Controller(self.dict.get('Controller', None)) if self.dict.get('Controller', None) else None
             self.accessories = None
             if self.dict.get('Accessories', None):
@@ -70,12 +75,14 @@ class Machine:
             self._z_clear = None
             self._fan_speed = None
             self.gcode = None
-        ap = argparse.ArgumentParser()
-        ap.add_argument("-s", "--simulate", action='store_true', help="Simulate G-code in CAMotics")
-        ap.add_argument("-l", "--load", action='store_true', help=f"Send G-code to {self.name} but do not execute")
-        ap.add_argument("-e", "--execute", action='store_true', help=f"Send G-code to {self.name} and execute")
-        ap.add_argument("arg", help="Optional argument passed back to the calling script", nargs='?', default=None)
-        self._args = ap.parse_args()
+            self.use_styles = False
+            
+        # ap = argparse.ArgumentParser()
+        # ap.add_argument("-s", "--simulate", action='store_true', help="Simulate G-code in CAMotics")
+        # ap.add_argument("-l", "--load", action='store_true', help=f"Send G-code to {self.name} but do not execute")
+        # ap.add_argument("-e", "--execute", action='store_true', help=f"Send G-code to {self.name} and execute")
+        # ap.add_argument("arg", help="Optional argument passed back to the calling script", nargs='?', default=None)
+        # self._args = ap.parse_args()
         self._initialized = True
 
 ################################################################################
@@ -734,6 +741,38 @@ class Machine:
         self.queue(code='M107', comment="Turning fan off")
 
 ################################################################################
+# Spindle Control
+################################################################################
+
+    def spindle_on(self):
+        self.queue(code='M3', comment="Turning spindle on")
+
+    def spindle_off(self):
+        self.queue(code='M5', comment="Turning spindle off")
+
+################################################################################
+# Coolant Control
+################################################################################
+
+    def mist_on(self):
+        self.queue(code='M7', comment="Turning mist on")
+
+    def mist_off(self):
+        self.queue(code='M9', comment="Turning mist off")
+
+################################################################################
+# Beginning and end of GCODE file
+################################################################################
+
+    def begin_gcode(self):
+        if self._begin_gcode:
+            self.queue(code=self._begin_gcode)
+
+    def end_gcode(self):
+        if self._end_gcode:
+            self.queue(code=self._end_gcode)
+          
+################################################################################
 # Turtle Object Reference
 ################################################################################
 
@@ -805,7 +844,10 @@ class Machine:
             if command.get('s',None) is not None:       # Spindle RPM, Bed/Hotend Temperature
                 line += f" S{command['s']:.4f}"
             if command.get('comment',None) is not None: # Human-readable comments
-                line += f"; {styles[command.get('style', '')]}{command.get('comment', '')}{ENDC}"
+                if self.use_styles:
+                    line += f"; {styles[command.get('style', '')]}{command.get('comment', '')}{ENDC}"
+                else:
+                    line += f"; {command.get('comment', '')}"
             self.gcode_array.append(line)
         self.gcode = "\n".join(self.gcode_array)
 
@@ -933,7 +975,7 @@ class Machine:
 
     def camotics(self, filename=sys.argv[0]+'.nc'):
         import os
-        self.save_gcode(filename)
+        #self.save_gcode(filename)
         os.system(f"camotics {filename}")
 
     CAMotics = camotics

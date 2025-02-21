@@ -1,0 +1,13 @@
+{ 
+  "1": {
+    "units": "metric",
+    "shape": "cylindrical",
+    "length": 30,
+    "flutes": 1,
+    "flute_length": 5,
+    "diameter": 2.0,
+    "shank": 3.17,
+    "material": "Carbide",
+    "description": "2mm\" Straight Router Bit, 1 Flutes, 1/4\" Shank, Carbide"
+  }
+}
