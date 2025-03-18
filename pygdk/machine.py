@@ -45,8 +45,7 @@ class Machine:
                 if not self.dict.get(req, None):
                     raise ValueError(f"{RED}All machines must have '{req}' defined in their JSON config.  See https://github.com/cilynx/pygdk/tree/main/machines for example configurations.")
             self.name = self.dict['Name']
-            self.command_queue = [{'comment': f"Initializing Machine {self.name}", 'style': 'machine'}]
-            
+            self.command_queue = [{'comment': f"Initializing Machine {self.name}", 'style': 'machine'}]              
             self._begin_gcode = self.dict.get('Begin_GCODE', None)
             self._end_gcode = self.dict.get('End_GCODE', None)
                 
@@ -106,6 +105,12 @@ class Machine:
     def queue(self, **kwargs):
         self.command_queue.append(kwargs)
 
+    def queue_insert(self, **kwargs):
+        self.command_queue.insert(0, kwargs)
+        
+    def insert_preamble(self, preamble):
+        self.queue_insert(code=preamble)   
+        
 ################################################################################
 # CAMotics-compatible Tool Table
 ################################################################################
@@ -372,7 +377,7 @@ class Machine:
 
     def bolt_circle(self, c_x, c_y, n, r, depth=0, theta=0):
         self.queue(comment=f"Bolt Circle | n:{n}, c:{[c_x,c_y]}, r:{r}, depth:{depth}", style='feature')
-        self.rapid(z=10, comment="Rapid to Safe Z")
+        self.rapid(z=self.safe_z, comment="Rapid to Safe Z")
         theta = math.radians(theta)
         delta_theta = 2*math.pi/n
         for i in range(n):
@@ -380,7 +385,7 @@ class Machine:
             y = c_y + (r * math.sin(theta))
             self.rapid(x, y, comment=f"Rapid to {i+1}")
             self.linear_interpolation(z=depth, comment=f"Drill {i+1}")
-            self.rapid(z=10, comment="Retract")
+            self.rapid(z=self.safe_z, comment="Retract")
             theta += delta_theta
         self.queue(comment='Bolt Circle | END', style='feature')
 
@@ -414,11 +419,18 @@ class Machine:
             diameter = -diameter
         self.absolute = True
         self.rapid(z=self.safe_z, comment="Rapid to Safe Z")
-        self.rapid(c_x+diameter/2-self.tool.diameter/2, c_y, comment="Rapid to pocket offset")
-        self.rapid(z=0.1, comment="Rapid to workpiece surface")
+        self.rapid(c_x+diameter/2-self.tool.diameter/2, c_y, comment="Rapid move to pocket offset")
+        
+        #self.rapid(z=0.1, comment="Rapid to workpiece surface")
+        self.move(z=0.1, li=True, comment="Move to workpiece surface")
+        
+        feed = self.feed
+        if diameter - self.tool.diameter < 2:
+            feed = feed/2
+            
         self.queue(code='G17', comment='Helix in XY-plane')
-        self.queue(code='G2', z=-depth, i=self.tool.diameter/2-diameter/2, j=0, p=int(depth/z_step), f=self.feed, comment='Heli-drill')
-        self.queue(code='G2', i=self.tool.diameter/2-diameter/2, j=0, p=1, f=self.feed, comment="Clean the bottom")
+        self.queue(code='G2', z=-depth, i=self.tool.diameter/2-diameter/2, j=0, p=int(depth/z_step), f=feed, comment='Heli-drill')
+        self.queue(code='G2', i=self.tool.diameter/2-diameter/2, j=0, p=1, f=feed, comment="Clean the bottom")
         if retract:
             self.rapid(z=self.safe_z, comment="Retract")
             self.rapid(c_x, c_y, comment="Re-Center")
@@ -441,7 +453,7 @@ class Machine:
             drill_diameter = diameter - 2*finish
         self.mill_drill(c_x, c_y, drill_diameter, depth, step, retract=False)
         center = self.tool.diameter/2-drill_diameter/2
-        i = 0;
+        i = 0
         for i in range(1, int((diameter/2-drill_diameter/2)/step)+1):
             if i%2:
                 # Right to Left
@@ -471,7 +483,7 @@ class Machine:
 
     def pocket_circle(self, c_x, c_y, n, r, depth, diameter, theta=0, step=None, finish=0.1):
         self.queue(comment=f"Pocket Circle | n:{n}, c:{[c_x,c_y]}, r:{r}, depth:{depth}, diameter:{diameter}, step:{step}, finish:{finish}", style='feature')
-        self.rapid(z=10, comment="Rapid to Safe Z")
+        self.rapid(z=self.safe_z, comment="Rapid to Safe Z")
         theta = math.radians(theta)
         delta_theta = 2*math.pi/n
         for i in range(n):
@@ -485,7 +497,8 @@ class Machine:
 # Rectangular Frame
 ################################################################################
 
-    def frame(self, c_x, c_y, x, y, z_top=0, z_bottom=0, z_step=None, inside=False, retract=True, c='center', r=None, r_steps=10):
+    def frame(self, c_x, c_y, x, y, z_top=0, z_bottom=0, z_step=None, inside=False, retract=True, c='center', r=None, r_steps=10,
+              tabs_height=0, tabs_along='', tabs_width=1):
         self.queue(comment=f"Rectangular Frame | [c_x,c_y]: {['{:.4f}'.format(c_x), '{:.4f}'.format(c_y)]}, x: {x:.4f}, y: {y:.4f}, z_top: {z_top}, z_bottom: {z_bottom}, z_step: {z_step}, inside: {inside}, c: {c}, r: {r}", style='feature')
 
         if r is None:
@@ -525,25 +538,48 @@ class Machine:
         tool_d = -self.tool.diameter if inside else self.tool.diameter
         tool_r = tool_d/2
 
-        turtle = self.turtle(verbose=True)
+        turtle = self.turtle(verbose=False)
         turtle.penup()
-        turtle.goto(flx+r, fly-tool_r, z_top, comment="Rapid to front-left corner:")
+        turtle.goto(flx+r, fly-tool_r, z=self.safe_z, comment="Rapid to front-left corner:")
         turtle.pendown(z_top)
+        
+        tabs_x_z = tabs_height + z_bottom if 'x' in tabs_along else z_bottom
+        tabs_y_z = tabs_height + z_bottom if 'y' in tabs_along else z_bottom
+
         for i in range(passes+1):
             if i == passes:
                 z_step = 0
-            turtle.forward(x-2*r, -z_step/4)
+            self._forward_tabs(turtle, x-2*r, tabs_x_z, tabs_width, z_step/4)
             turtle.circle(radius=r+tool_r, extent=90, steps=r_steps) # TODO: Implement smooth Turtle circles and drop the steps here
-            turtle.forward(y-2*r, -z_step/4)
+            self._forward_tabs(turtle, y-2*r, tabs_y_z, tabs_width, z_step/4)
             turtle.circle(radius=r+tool_r, extent=90, steps=r_steps)
-            turtle.forward(x-2*r, -z_step/4)
+            self._forward_tabs(turtle, x-2*r, tabs_x_z, tabs_width, z_step/4)            
             turtle.circle(radius=r+tool_r, extent=90, steps=r_steps)
-            turtle.forward(y-2*r, -z_step/4)
+            self._forward_tabs(turtle, y-2*r, tabs_y_z, tabs_width, z_step/4)
             turtle.circle(radius=r+tool_r, extent=90, steps=r_steps)
 
         self.retract()
         self.queue(comment='Rectangular Frame | END', style='feature')
 
+    def _tab(self, turtle, tab_offset, tab_width):
+        turtle.forward(tab_offset, tab_offset, comment="Tab begin")
+        turtle.forward(self.tool.diameter + tab_width, 0)
+        turtle.forward(tab_offset, -tab_offset, comment="Tab end")
+        return 2 * tab_offset + self.tool.diameter + tab_width
+                    
+    def _forward_tabs(self, turtle, distance, tabs_z, tab_width, step):
+        tab_offset = -(self._z - tabs_z - step)
+
+        if tab_offset <= 0.1:
+            turtle.forward(distance, -step)
+        else:
+            tab_offset1 = max(0, -(self._z - tabs_z))
+            tab_offset2 = max(0, -(self._z - tabs_z - step))
+            delta = 2 * (tab_offset1 + tab_offset2 + self.tool.diameter + tab_width )
+            self._tab(turtle, tab_offset1, tab_width)
+            turtle.forward(distance - delta, -step)
+            self._tab(turtle, tab_offset2, tab_width)           
+    
     rectangle = frame
 
 ################################################################################
@@ -760,6 +796,13 @@ class Machine:
     def mist_off(self):
         self.queue(code='M9', comment="Turning mist off")
 
+################################################################################
+# Coordinates rotation
+################################################################################
+
+    def rotate(self, value):
+        self.queue(code=f'G0 L2 P1 R{value}', comment="Rotate coordinates")
+        
 ################################################################################
 # Beginning and end of GCODE file
 ################################################################################
