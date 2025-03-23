@@ -562,7 +562,7 @@ class Machine:
         self.queue(comment='Rectangular Frame | END', style='feature')
 
     def _tab(self, turtle, tab_offset, tab_width):
-        turtle.forward(tab_offset, tab_offset, comment="Tab begin")
+        turtle.forward(tab_offset, tab_offset, comment="Tab begin - height=%.1f" % (tab_offset))
         turtle.forward(self.tool.diameter + tab_width, 0)
         turtle.forward(tab_offset, -tab_offset, comment="Tab end")
         return 2 * tab_offset + self.tool.diameter + tab_width
