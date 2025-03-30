@@ -366,10 +366,14 @@ class Machine:
         self.move(u, v, w, absolute=False, li=True, comment=comment)
 
     def retract(self, x=None, y=None, comment="Retract"):
-        self.move(x, y, self.safe_z, comment=comment)
+        self.move(x, y, self.retract_z, comment=comment)
 
     def full_retract(self, comment="Full retract"):
-        self.move(z=0, machine_coord=True, comment=comment)
+        self.move(z=self.G53_clearance_z, machine_coord=True, comment=comment)
+        
+    def park(self, comment="Park"):
+        self.full_retract()
+        self.move(x=self.G53_park_x, y=self.G53_park_y, machine_coord=True, comment=comment)
 
 ################################################################################
 # Machine.bolt_circle() -- Make a Bolt Circle
@@ -377,7 +381,7 @@ class Machine:
 
     def bolt_circle(self, c_x, c_y, n, r, depth=0, theta=0):
         self.queue(comment=f"Bolt Circle | n:{n}, c:{[c_x,c_y]}, r:{r}, depth:{depth}", style='feature')
-        self.rapid(z=self.safe_z, comment="Rapid to Safe Z")
+        self.rapid(z=self.retract_z, comment="Rapid to Retract Z")
         theta = math.radians(theta)
         delta_theta = 2*math.pi/n
         for i in range(n):
@@ -385,7 +389,7 @@ class Machine:
             y = c_y + (r * math.sin(theta))
             self.rapid(x, y, comment=f"Rapid to {i+1}")
             self.linear_interpolation(z=depth, comment=f"Drill {i+1}")
-            self.rapid(z=self.safe_z, comment="Retract")
+            self.rapid(z=self.retract_z, comment="Retract")
             theta += delta_theta
         self.queue(comment='Bolt Circle | END', style='feature')
 
@@ -418,7 +422,7 @@ class Machine:
         if outside:
             diameter = -diameter
         self.absolute = True
-        self.rapid(z=self.safe_z, comment="Rapid to Safe Z")
+        self.rapid(z=self.retract_z, comment="Rapid to Retract Z")
         self.rapid(c_x+diameter/2-self.tool.diameter/2, c_y, comment="Rapid move to pocket offset")
         
         #self.rapid(z=0.1, comment="Rapid to workpiece surface")
@@ -432,7 +436,7 @@ class Machine:
         self.queue(code='G2', z=-depth, i=self.tool.diameter/2-diameter/2, j=0, p=int(depth/z_step), f=feed, comment='Heli-drill')
         self.queue(code='G2', i=self.tool.diameter/2-diameter/2, j=0, p=1, f=feed, comment="Clean the bottom")
         if retract:
-            self.rapid(z=self.safe_z, comment="Retract")
+            self.rapid(z=self.retract_z, comment="Retract")
             self.rapid(c_x, c_y, comment="Re-Center")
         self.queue(comment='Helix | END', style='feature')
 
@@ -474,7 +478,7 @@ class Machine:
             self.queue(code='G2', i=center-i*step+step/2+(x2-x1)/2, x=x2, f=self.feed, comment='Getting to final dimension')
             self.queue(code='G2', i=diameter/2-self.tool.diameter/2, f=self.feed, comment='Final pass')
         if retract:
-            self.rapid(c_x, c_y, self.safe_z, comment="Retract")
+            self.rapid(c_x, c_y, self.retract_z, comment="Retract")
         self.queue(comment='Circular Pocket | END', style='feature')
 
 ################################################################################
@@ -483,7 +487,7 @@ class Machine:
 
     def pocket_circle(self, c_x, c_y, n, r, depth, diameter, theta=0, step=None, finish=0.1):
         self.queue(comment=f"Pocket Circle | n:{n}, c:{[c_x,c_y]}, r:{r}, depth:{depth}, diameter:{diameter}, step:{step}, finish:{finish}", style='feature')
-        self.rapid(z=self.safe_z, comment="Rapid to Safe Z")
+        self.rapid(z=self.retract_z, comment="Rapid to Retract Z")
         theta = math.radians(theta)
         delta_theta = 2*math.pi/n
         for i in range(n):
@@ -540,7 +544,7 @@ class Machine:
 
         turtle = self.turtle(verbose=False)
         turtle.penup()
-        turtle.goto(flx+r, fly-tool_r, z=self.safe_z, comment="Rapid to front-left corner:")
+        turtle.goto(flx+r, fly-tool_r, z=self.retract_z, comment="Rapid to front-left corner:")
         turtle.pendown(z_top)
         
         tabs_x_z = tabs_height + z_bottom if 'x' in tabs_along else z_bottom
@@ -762,7 +766,7 @@ class Machine:
             self.linear_interpolation(c_x-x/2+d/2-corner, c_y+y/2-d/2+corner, comment="Bottom Left Undercut")
             self.linear_interpolation(c_x-x/2+d/2, c_y+y/2-d/2)
         if retract:
-            self.rapid(c_x, c_y, self.safe_z, comment="Retract")
+            self.rapid(c_x, c_y, self.retract_z, comment="Retract")
 
         self.queue(comment='Legacy Rectangular Pocke | END', style='feature')
 

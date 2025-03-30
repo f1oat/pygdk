@@ -1,9 +1,13 @@
 {
   "Name": "CNC-6040",
   "Type": "Mill",
-  "Begin_GCODE":  "G90 G94 G17 G91.1 G21\nG53 G0 Z92.\nG17 G54 G64 P0.01 Q0.01",
-  "End_GCODE": "M5 G53 G0 Z92. M30",
+  "Begin_GCODE":  "G90 G94 G17 G91.1 G21\nG53 G0 Z92\nG17 G54 G64 P0.01 Q0.01",
+  "End_GCODE": "M5\nG53 G0 Z92\nG53 G0 X633 Y385\nM30",
   "Max Feed Rate (mm/min)": 3000,
   "Max Spindle RPM": 24000,
-  "Tool Table": "cnc-6040-tools.json"
+  "Tool Table": "cnc-6040-tools.json",
+  "retract_z": 10,
+  "G53_clearance_z": 92,
+  "G53_park_x": 633,
+  "G53_park_y": 385
 }

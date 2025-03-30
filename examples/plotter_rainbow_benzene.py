@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 from pygdk import Plotter
 
-onefinity = Plotter('onefinity.json', safe_z=-120)
+onefinity = Plotter('onefinity.json', retract_z=-120)
 onefinity.feed = 5000
 
 onefinity._optimize = True

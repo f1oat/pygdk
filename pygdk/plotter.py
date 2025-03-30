@@ -25,7 +25,7 @@ class Plotter(Machine):
         with open(f"tables/{self.dict['Tool Table']}", 'r') as tt:
             self._tool_table = json.load(tt)
 
-        self.safe_z = self._plotter['Z-Stage']
+        self.retract_z = self._plotter['Z-Stage']
         self.z_draw = self._plotter['Z-Touch']
 
 ################################################################################

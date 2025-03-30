@@ -26,7 +26,10 @@ class Mill(Machine):
             with open(f"{self.gdkpath}/tables/{dict['Tool Table']}", 'r') as tt:
                 self._tool_table = json.load(tt)
             self.max_rpm = dict['Max Spindle RPM']
-            self.safe_z = 10 #TODO: This should be in a Workpiece class
+            self.retract_z = dict.get("retract_z", 10)
+            self.G53_clearance_z = dict.get("G53_clearance_z", 0)
+            self.G53_park_x = dict.get("G53_park_x", 0)
+            self.G53_park_y = dict.get("G53_park_y", 0)
 
 ################################################################################
 # Constant Surface Speed

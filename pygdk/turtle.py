@@ -341,7 +341,7 @@ class Turtle:
     def penup(self):
         self._isdown = False
         self._machine.retract(comment="Penup" if self._verbose else None)
-        self._z = self._machine.safe_z
+        self._z = self._machine.retract_z
 
     pu = penup
     up = penup
@@ -429,9 +429,9 @@ class Turtle:
                 if n is None: n = system['n']
                 lift = system.get('lift',lift)
 
-        safe_z = self._machine.safe_z
+        retract_z = self._machine.retract_z
         if lift is False:
-            self._machine.safe_z = self._z_draw
+            self._machine.retract_z = self._z_draw
 
         if arms is not None:
             angle = 360/arms
@@ -481,7 +481,7 @@ class Turtle:
                         self.penup()
                     self.goto(position[0], position[1])
                 self.orientation = orientation
-        self._machine.safe_z = safe_z
+        self._machine.retract_z = retract_z
 
 ################################################################################
 # Bethlehem Star
